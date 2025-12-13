@@ -63,3 +63,51 @@ def validate_character_payload(payload):
     return True, {"name": name.strip(), "stat_id": stat_id, "class_id": class_id, "weapon_id": weapon_id}
 
 
+def dict_to_xml(tag, data):
+    elem = ET.Element(tag)
+
+    def build(parent, key, val):
+        if isinstance(val, list):
+            list_elem = ET.SubElement(parent, key)
+            for item in val:
+                item_elem = ET.SubElement(list_elem, "item")
+                if isinstance(item, dict):
+                    for k, v in item.items():
+                        build(item_elem, k, v)
+                else:
+                    item_elem.text = "" if item is None else str(item)
+        elif isinstance(val, dict):
+            child = ET.SubElement(parent, key)
+            for k, v in val.items():
+                build(child, k, v)
+        else:
+            child = ET.SubElement(parent, key)
+            child.text = "" if val is None else str(val)
+
+    if isinstance(data, dict):
+        for k, v in data.items():
+            build(elem, k, v)
+    elif isinstance(data, list):
+        for item in data:
+            item_elem = ET.SubElement(elem, "item")
+            if isinstance(item, dict):
+                for k, v in item.items():
+                    build(item_elem, k, v)
+            else:
+                item_elem.text = "" if item is None else str(item)
+    else:
+        elem.text = "" if data is None else str(data)
+    return elem
+
+
+def format_response(data, status=200, output_format="json"):
+    if output_format == "xml":
+        root = dict_to_xml("response", data if isinstance(data, (dict, list)) else {"data": data})
+        xml_str = ET.tostring(root, encoding="utf-8")
+        return xml_str, status, {"Content-Type": "application/xml"}
+    return jsonify(data), status
+
+
+def parse_format(request):
+    fmt = request.args.get("format", "json").lower()
+    return "xml" if fmt == "xml" else "json"
